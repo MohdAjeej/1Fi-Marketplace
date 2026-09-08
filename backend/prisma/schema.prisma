@@ -1,0 +1,136 @@
+// Prisma Schema for 1Fi Marketplace
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  phone         String?   @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  orders        Order[]
+  cart          CartItem[]
+
+  @@map("users")
+}
+
+model Product {
+  id              String              @id @default(uuid())
+  name            String
+  brand           String
+  category        String
+  basePrice       Float
+  originalPrice   Float?
+  discount        Int?
+  image           String
+  description     String              @db.Text
+  highlights      String[]
+  specifications  Json
+  inStock         Boolean             @default(true)
+  rating          Float?
+  reviewCount     Int?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  variants        ProductVariant[]
+  emiPlans        EMIPlan[]
+  orderItems      OrderItem[]
+  cartItems       CartItem[]
+
+  @@map("products")
+}
+
+model ProductVariant {
+  id              String              @id @default(uuid())
+  productId       String
+  type            String              // e.g., "Storage", "Color", "RAM"
+  name            String              // e.g., "128GB", "Blue"
+  value           String              // e.g., "128 GB", "Blue"
+  priceModifier   Float               @default(0)
+  product         Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@map("product_variants")
+}
+
+model EMIPlan {
+  id              String              @id @default(uuid())
+  productId       String
+  tenure          Int                 // in months
+  monthlyAmount   Float
+  totalAmount     Float
+  interestRate    Float
+  isNoCost        Boolean             @default(false)
+  product         Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems      OrderItem[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@map("emi_plans")
+}
+
+model Order {
+  id              String              @id @default(uuid())
+  userId          String
+  orderNumber     String              @unique
+  status          OrderStatus         @default(PENDING)
+  totalAmount     Float
+  shippingAddress Json
+  user            User                @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                String            @id @default(uuid())
+  orderId           String
+  productId         String
+  emiPlanId         String
+  selectedVariants  Json              // { "Storage": "storage-256", "Color": "color-blue" }
+  quantity          Int               @default(1)
+  price             Float
+  order             Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product           Product           @relation(fields: [productId], references: [id])
+  emiPlan           EMIPlan           @relation(fields: [emiPlanId], references: [id])
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("order_items")
+}
+
+model CartItem {
+  id                String            @id @default(uuid())
+  userId            String
+  productId         String
+  selectedVariants  Json              // { "Storage": "storage-256", "Color": "color-blue" }
+  emiPlanId         String?
+  quantity          Int               @default(1)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product           Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("cart_items")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}

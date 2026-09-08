@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "1fi2",
+    "name": "1Fi",
     "slug": "1fi2",
     "version": "1.0.0",
+    "scheme": "onefi",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,6 +21,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar"
+    ]
   }
 }
