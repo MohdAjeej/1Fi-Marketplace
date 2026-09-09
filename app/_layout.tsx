@@ -10,13 +10,7 @@ export default function RootLayout() {
         <StatusBar style="dark" />
         <Stack
           screenOptions={{
-            headerStyle: {
-              backgroundColor: '#1E40AF',
-            },
-            headerTintColor: '#fff',
-            headerTitleStyle: {
-              fontWeight: '600',
-            },
+            headerShown: false,
           }}
         >
           <Stack.Screen 
@@ -26,39 +20,36 @@ export default function RootLayout() {
           <Stack.Screen 
             name="marketplace/index" 
             options={{ 
-              title: '1Fi Marketplace',
+              headerShown: false,
               presentation: 'card'
             }} 
           />
           <Stack.Screen 
             name="marketplace/product/[id]" 
             options={{ 
-              title: 'Product Details',
+              headerShown: false,
               presentation: 'card'
             }} 
           />
           <Stack.Screen 
             name="brands/index" 
             options={{ 
-              title: 'Top Brands',
+              headerShown: false,
               presentation: 'card',
-              headerShown: false
             }} 
           />
           <Stack.Screen 
             name="stores/index" 
             options={{ 
-              title: 'Nearby Stores',
+              headerShown: false,
               presentation: 'card',
-              headerShown: false
             }} 
           />
           <Stack.Screen 
             name="checkout/index" 
             options={{ 
-              title: 'Checkout',
+              headerShown: false,
               presentation: 'modal',
-              headerShown: false
             }} 
           />
         </Stack>

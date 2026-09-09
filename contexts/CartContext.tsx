@@ -1,18 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, EMIPlan } from '../types/product';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { safeStorage } from '../utils/safeStorage';
+import { Product, EMIPlan, CartItem } from '../types/product';
 
-export interface CartItem {
-  id: string;
-  product: Product;
-  quantity: number;
-  selectedVariants: Record<string, string>;
-  selectedEMIPlan: EMIPlan;
-}
+export { CartItem };
+
+const CART_STORAGE_KEY = '@1fi_cart_items';
 
 interface CartContextType {
   items: CartItem[];
   itemCount: number;
   totalAmount: number;
+  loading: boolean;
   addToCart: (product: Product, variants: Record<string, string>, emiPlan: EMIPlan, quantity?: number) => void;
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
@@ -23,6 +21,45 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const isInitialLoadDone = useRef(false);
+
+  // 1. Load persisted cart items on initial mount
+  useEffect(() => {
+    const loadCart = async () => {
+      try {
+        const stored = await safeStorage.getItem(CART_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setItems(parsed);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load cart from storage:', error);
+      } finally {
+        isInitialLoadDone.current = true;
+        setLoading(false);
+      }
+    };
+
+    loadCart();
+  }, []);
+
+  // 2. Persist cart items whenever items change (after initial load)
+  useEffect(() => {
+    if (!isInitialLoadDone.current) return;
+
+    const saveCart = async () => {
+      try {
+        await safeStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      } catch (error) {
+        console.error('Failed to save cart to storage:', error);
+      }
+    };
+
+    saveCart();
+  }, [items]);
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   
@@ -102,6 +139,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         items,
         itemCount,
         totalAmount,
+        loading,
         addToCart,
         removeFromCart,
         updateQuantity,
@@ -120,3 +158,4 @@ export function useCart() {
   }
   return context;
 }
+

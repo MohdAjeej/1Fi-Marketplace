@@ -24,8 +24,23 @@ try {
   console.log('expo-location not installed, location features will be limited');
 }
 
+interface StoreItem {
+  id: number;
+  name: string;
+  logo: string;
+  address: string;
+  distance: string;
+  phone: string;
+  hours: string;
+  gradient: readonly [string, string];
+  lat: number;
+  lng: number;
+  rating: number;
+  services: string[];
+}
+
 // Mock store data - In real app, this would come from API based on user location
-const NEARBY_STORES = [
+const NEARBY_STORES: StoreItem[] = [
   {
     id: 1,
     name: 'Croma',

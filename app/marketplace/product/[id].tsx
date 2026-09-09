@@ -11,26 +11,27 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { Product, ProductVariant, EMIPlan } from '../../../types/product';
+import { Product, EMIPlan } from '../../../types/product';
 import { getProductById } from '../../../services/marketplaceService';
 import { useCart } from '../../../contexts/CartContext';
+import { Colors, Fonts, Space, Radii, Shadow, formatPrice as fmtPrice } from '../../../constants/theme';
 
 const { width } = Dimensions.get('window');
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { addToCart } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [selectedEMIPlan, setSelectedEMIPlan] = useState<EMIPlan | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const { addToCart, itemCount } = useCart();
 
   useEffect(() => {
     loadProduct();
@@ -43,7 +44,6 @@ export default function ProductDetailScreen() {
       const data = await getProductById(id);
       if (data) {
         setProduct(data);
-        // Pre-select first variant option for each variant type
         const initialVariants: Record<string, string> = {};
         data.variants.forEach((variantGroup) => {
           if (variantGroup.options.length > 0) {
@@ -51,8 +51,8 @@ export default function ProductDetailScreen() {
           }
         });
         setSelectedVariants(initialVariants);
-        // Pre-select recommended EMI plan (6 months if available)
-        const recommendedPlan = data.emiPlans.find((plan) => plan.tenure === 6) || data.emiPlans[0];
+        const recommendedPlan =
+          data.emiPlans.find((plan) => plan.tenure === 6) || data.emiPlans[0];
         setSelectedEMIPlan(recommendedPlan);
       } else {
         setError('Product not found');
@@ -66,20 +66,19 @@ export default function ProductDetailScreen() {
   };
 
   const handleVariantSelect = (variantType: string, variantId: string) => {
-    setSelectedVariants((prev) => ({
-      ...prev,
-      [variantType]: variantId,
-    }));
+    setSelectedVariants((prev) => ({ ...prev, [variantType]: variantId }));
   };
 
   const handleEMISelect = (plan: EMIPlan) => {
     setSelectedEMIPlan(plan);
   };
 
+  const formatPrice = (price: number): string =>
+    `₹${Math.round(price).toLocaleString('en-IN')}`;
+
   const handleContinue = () => {
     if (!product || !selectedEMIPlan) return;
 
-    // Validate all variants are selected
     const allVariantsSelected = product.variants.every(
       (variantGroup) => selectedVariants[variantGroup.type]
     );
@@ -89,25 +88,23 @@ export default function ProductDetailScreen() {
       return;
     }
 
-    // Add to cart
     addToCart(product, selectedVariants, selectedEMIPlan, 1);
 
     Alert.alert(
-      'Added to Cart! 🛒',
-      `${product.name}\nEMI: ₹${selectedEMIPlan.monthlyAmount.toLocaleString('en-IN')}/mo for ${selectedEMIPlan.tenure} months`,
+      'Added to Cart ✓',
+      `${product.name}\nEMI: ₹${selectedEMIPlan.monthlyAmount.toLocaleString('en-IN')}/mo × ${selectedEMIPlan.tenure} months`,
       [
-        { text: 'Continue Shopping', style: 'cancel', onPress: () => router.back() },
-        { text: 'View Cart', onPress: () => router.push('/(tabs)/cart') },
+        { text: 'Continue Shopping', style: 'cancel', onPress: () => router.navigate('/marketplace') },
+        { text: 'View Cart', onPress: () => router.push('/cart') },
       ]
     );
   };
 
   const handleShare = async () => {
     if (!product) return;
-
     try {
       await Share.share({
-        message: `Check out ${product.name} on 1Fi Marketplace! Starting from ₹${product.basePrice.toLocaleString('en-IN')} with No-Cost EMI available.`,
+        message: `Check out ${product.name} on 1Fi Marketplace! Starting from ₹${product.basePrice.toLocaleString('en-IN')} with No-Cost EMI.`,
         title: product.name,
       });
     } catch (error) {
@@ -115,20 +112,11 @@ export default function ProductDetailScreen() {
     }
   };
 
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-    Alert.alert(
-      isFavorite ? 'Removed from Wishlist' : 'Added to Wishlist',
-      isFavorite ? 'Product removed from your wishlist' : 'Product added to your wishlist',
-      [{ text: 'OK' }]
-    );
-  };
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1E40AF" />
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color="#4F46E5" />
           <Text style={styles.loadingText}>Loading product...</Text>
         </View>
       </SafeAreaView>
@@ -137,223 +125,275 @@ export default function ProductDetailScreen() {
 
   if (error || !product) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorTitle}>Unable to load product</Text>
-          <Text style={styles.errorText}>{error || 'Product not found'}</Text>
-          <Pressable style={styles.retryButton} onPress={() => router.back()}>
-            <Text style={styles.retryButtonText}>Go Back</Text>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.loadingWrap}>
+          <Text style={{ fontSize: 48, marginBottom: 16 }}>😔</Text>
+          <Text style={styles.errorTitle}>{error || 'Product not found'}</Text>
+          <Pressable onPress={() => router.back()} style={styles.errorBtn}>
+            <Text style={styles.errorBtnText}>Go Back</Text>
           </Pressable>
         </View>
       </SafeAreaView>
     );
   }
 
-  const displayPrice = product.basePrice;
+  const variantPriceModifier = Object.values(selectedVariants).reduce((total, variantId) => {
+    const variant = product.variants.flatMap((v) => v.options).find((opt) => opt.id === variantId);
+    return total + (variant?.priceModifier || 0);
+  }, 0);
+  const displayPrice = product.basePrice + variantPriceModifier;
   const hasDiscount = product.discount && product.discount > 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView style={styles.scrollView}>
-        {/* Product Image */}
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: product.image }} style={styles.productImage} resizeMode="contain" />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Navigation */}
+      <View style={styles.navBar}>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.navBtn, pressed && { backgroundColor: '#E5E7EB' }]}
+        >
+          <Text style={styles.navBtnIcon}>←</Text>
+        </Pressable>
+        <View style={styles.navCenter}>
+          <Text style={styles.navBrand} numberOfLines={1}>{product.brand}</Text>
+        </View>
+        <View style={styles.navRight}>
+          <Pressable
+            onPress={handleShare}
+            style={({ pressed }) => [styles.navBtn, pressed && { backgroundColor: '#E5E7EB' }]}
+          >
+            <Text style={styles.navBtnIcon}>↗</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/cart')}
+            style={({ pressed }) => [styles.navBtn, pressed && { backgroundColor: '#E5E7EB' }]}
+          >
+            <Text style={{ fontSize: 20 }}>🛒</Text>
+            {itemCount > 0 && (
+              <View style={styles.navCartBadge}>
+                <Text style={styles.navCartBadgeText}>{itemCount}</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
+      </View>
+
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+        {/* Product Image Hero */}
+        <View style={styles.heroSection}>
+          <Image source={{ uri: product.image }} style={styles.heroImage} resizeMode="contain" />
           {hasDiscount && (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{product.discount}% OFF</Text>
-            </View>
+            <LinearGradient colors={['#EF4444', '#DC2626'] as const} style={styles.heroDiscountBadge}>
+              <Text style={styles.heroDiscountText}>{product.discount}% OFF</Text>
+            </LinearGradient>
           )}
-          {/* Action Buttons */}
-          <View style={styles.imageActions}>
-            <Pressable style={styles.actionButton} onPress={toggleFavorite}>
-              <Text style={styles.actionIcon}>{isFavorite ? '❤️' : '🤍'}</Text>
-            </Pressable>
-            <Pressable style={styles.actionButton} onPress={handleShare}>
-              <Text style={styles.actionIcon}>📤</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            style={[styles.heartBtn, isFavorite && styles.heartBtnActive]}
+            onPress={() => setIsFavorite(!isFavorite)}
+          >
+            <Text style={{ fontSize: 22, color: isFavorite ? '#EF4444' : '#9CA3AF' }}>
+              {isFavorite ? '♥' : '♡'}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Product Info */}
-        <View style={styles.contentContainer}>
-          <Text style={styles.brand}>{product.brand}</Text>
-          <Text style={styles.productName}>{product.name}</Text>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoBrand}>{product.brand}</Text>
+          <Text style={styles.infoName}>{product.name}</Text>
 
           {/* Rating */}
           {product.rating && (
-            <View style={styles.ratingContainer}>
-              <Text style={styles.ratingStar}>⭐</Text>
-              <Text style={styles.ratingText}>
-                {product.rating.toFixed(1)} ({product.reviewCount || 0} reviews)
+            <View style={styles.ratingRow}>
+              <LinearGradient colors={['#059669', '#047857'] as const} style={styles.ratingBadge}>
+                <Text style={styles.ratingStar}>★</Text>
+                <Text style={styles.ratingVal}>{product.rating.toFixed(1)}</Text>
+              </LinearGradient>
+              <Text style={styles.ratingReviews}>
+                {(product.reviewCount || 0).toLocaleString()} ratings
               </Text>
             </View>
           )}
 
           {/* Price */}
           <View style={styles.priceSection}>
-            <View style={styles.priceRow}>
-              <Text style={styles.price}>₹{displayPrice.toLocaleString('en-IN')}</Text>
-              {hasDiscount && product.originalPrice && (
-                <View style={styles.priceInfo}>
-                  <Text style={styles.originalPrice}>
-                    ₹{product.originalPrice.toLocaleString('en-IN')}
-                  </Text>
-                  <Text style={styles.savings}>
-                    Save ₹{(product.originalPrice - displayPrice).toLocaleString('en-IN')}
+            <Text style={styles.priceMain}>{formatPrice(displayPrice)}</Text>
+            {hasDiscount && product.originalPrice && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceOriginal}>
+                  MRP {formatPrice(product.originalPrice + variantPriceModifier)}
+                </Text>
+                <View style={styles.saveBadge}>
+                  <Text style={styles.saveText}>
+                    Save {formatPrice(product.originalPrice - product.basePrice)}
                   </Text>
                 </View>
-              )}
-            </View>
-            {!product.inStock && (
-              <View style={styles.outOfStockBanner}>
-                <Text style={styles.outOfStockText}>Currently Out of Stock</Text>
               </View>
             )}
           </View>
 
-          {/* Variants */}
-          {product.variants.map((variantGroup) => (
-            <View key={variantGroup.type} style={styles.variantSection}>
-              <Text style={styles.variantTitle}>
-                {variantGroup.type}
-                <Text style={styles.variantSelected}>
-                  {' '}
-                  -{' '}
-                  {
-                    variantGroup.options.find(
-                      (opt) => opt.id === selectedVariants[variantGroup.type]
-                    )?.value
-                  }
-                </Text>
-              </Text>
-              <View style={styles.variantOptions}>
-                {variantGroup.options.map((option) => (
+          {!product.inStock && (
+            <View style={styles.outOfStock}>
+              <Text style={styles.outOfStockText}>Currently Out of Stock</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Variants */}
+        {product.variants.map((variantGroup) => (
+          <View key={variantGroup.type} style={styles.sectionCard}>
+            <Text style={styles.sectionLabel}>{variantGroup.type}</Text>
+            <View style={styles.chipGrid}>
+              {variantGroup.options.map((option) => {
+                const isSelected = selectedVariants[variantGroup.type] === option.id;
+                return (
                   <Pressable
                     key={option.id}
-                    style={[
-                      styles.variantOption,
-                      selectedVariants[variantGroup.type] === option.id &&
-                        styles.variantOptionSelected,
-                    ]}
                     onPress={() => handleVariantSelect(variantGroup.type, option.id)}
                   >
-                    <Text
-                      style={[
-                        styles.variantOptionText,
-                        selectedVariants[variantGroup.type] === option.id &&
-                          styles.variantOptionTextSelected,
-                      ]}
-                    >
-                      {option.value}
-                    </Text>
+                    {isSelected ? (
+                      <LinearGradient
+                        colors={['#4F46E5', '#6366F1'] as const}
+                        style={styles.variantChip}
+                      >
+                        <Text style={[styles.variantLabel, { color: '#FFFFFF' }]}>{option.value}</Text>
+                        {option.priceModifier !== undefined && option.priceModifier > 0 && (
+                          <Text style={[styles.variantMod, { color: 'rgba(255,255,255,0.8)' }]}>
+                            +{formatPrice(option.priceModifier)}
+                          </Text>
+                        )}
+                      </LinearGradient>
+                    ) : (
+                      <View style={[styles.variantChip, styles.variantChipDefault]}>
+                        <Text style={styles.variantLabel}>{option.value}</Text>
+                        {option.priceModifier !== undefined && option.priceModifier > 0 && (
+                          <Text style={styles.variantMod}>+{formatPrice(option.priceModifier)}</Text>
+                        )}
+                      </View>
+                    )}
                   </Pressable>
-                ))}
-              </View>
+                );
+              })}
             </View>
-          ))}
-
-          {/* Highlights */}
-          {product.highlights.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Key Features</Text>
-              {product.highlights.map((highlight, index) => (
-                <View key={index} style={styles.highlightItem}>
-                  <Text style={styles.highlightBullet}>•</Text>
-                  <Text style={styles.highlightText}>{highlight}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Description */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.descriptionText}>{product.description}</Text>
           </View>
+        ))}
 
-          {/* Specifications */}
-          {Object.keys(product.specifications).length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Specifications</Text>
-              {Object.entries(product.specifications).map(([key, value]) => (
-                <View key={key} style={styles.specRow}>
-                  <Text style={styles.specKey}>{key}</Text>
-                  <Text style={styles.specValue}>{value}</Text>
-                </View>
-              ))}
+        {/* EMI Plans */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionLabelRow}>
+            <Text style={styles.sectionLabel}>EMI Plans</Text>
+            <View style={styles.noCostBadgeHeader}>
+              <Text style={styles.noCostBadgeHeaderText}>✨ No Cost EMI</Text>
             </View>
-          )}
+          </View>
+          <Text style={styles.sectionSub}>Backed by your mutual fund investments</Text>
 
-          {/* EMI Plans */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Choose Your EMI Plan</Text>
-            <Text style={styles.sectionSubtitle}>No Cost EMI backed by mutual funds</Text>
-            <View style={styles.emiPlansContainer}>
-              {product.emiPlans.map((plan) => (
-                <Pressable
-                  key={plan.id}
-                  style={[
-                    styles.emiPlan,
-                    selectedEMIPlan?.id === plan.id && styles.emiPlanSelected,
-                  ]}
-                  onPress={() => handleEMISelect(plan)}
-                >
-                  <View style={styles.emiPlanHeader}>
-                    <View style={styles.emiPlanInfo}>
-                      <Text style={styles.emiTenure}>{plan.tenure} Months</Text>
-                      <Text style={styles.emiAmount}>
-                        ₹{plan.monthlyAmount.toLocaleString('en-IN')} / month
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.radioButton,
-                        selectedEMIPlan?.id === plan.id && styles.radioButtonSelected,
-                      ]}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 20 }}>
+            {product.emiPlans.map((plan) => {
+              const isSelected = selectedEMIPlan?.id === plan.id;
+              return (
+                <Pressable key={plan.id} onPress={() => handleEMISelect(plan)}>
+                  {isSelected ? (
+                    <LinearGradient
+                      colors={['#4F46E5', '#7C3AED'] as const}
+                      style={styles.emiCard}
                     >
-                      {selectedEMIPlan?.id === plan.id && <View style={styles.radioButtonInner} />}
-                    </View>
-                  </View>
-                  {plan.isNoCost && (
-                    <View style={styles.noCostBadge}>
-                      <Text style={styles.noCostText}>No Cost EMI</Text>
+                      <View style={styles.emiCheckCircle}>
+                        <Text style={styles.emiCheckText}>✓</Text>
+                      </View>
+                      <Text style={[styles.emiTenure, { color: 'rgba(255,255,255,0.85)' }]}>{plan.tenure} months</Text>
+                      <Text style={[styles.emiAmount, { color: '#FFFFFF' }]}>₹{plan.monthlyAmount.toLocaleString('en-IN')}</Text>
+                      <Text style={[styles.emiPer, { color: 'rgba(255,255,255,0.7)' }]}>per month</Text>
+                      {plan.isNoCost && (
+                        <View style={[styles.noCostPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                          <Text style={[styles.noCostPillText, { color: '#FFFFFF' }]}>No Cost</Text>
+                        </View>
+                      )}
+                    </LinearGradient>
+                  ) : (
+                    <View style={[styles.emiCard, styles.emiCardDefault]}>
+                      <Text style={styles.emiTenure}>{plan.tenure} months</Text>
+                      <Text style={styles.emiAmount}>₹{plan.monthlyAmount.toLocaleString('en-IN')}</Text>
+                      <Text style={styles.emiPer}>per month</Text>
+                      {plan.isNoCost && (
+                        <View style={styles.noCostPill}>
+                          <Text style={styles.noCostPillText}>No Cost</Text>
+                        </View>
+                      )}
                     </View>
                   )}
-                  <View style={styles.emiPlanDetails}>
-                    <Text style={styles.emiDetailText}>
-                      Total: ₹{plan.totalAmount.toLocaleString('en-IN')}
-                    </Text>
-                    <Text style={styles.emiDetailText}>Interest: {plan.interestRate}%</Text>
-                  </View>
                 </Pressable>
-              ))}
-            </View>
-          </View>
+              );
+            })}
+          </ScrollView>
         </View>
+
+        {/* Key Features */}
+        {product.highlights.length > 0 && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionLabel}>Key Features</Text>
+            {product.highlights.map((h, i) => (
+              <View key={i} style={styles.featureItem}>
+                <LinearGradient colors={['#10B981', '#059669'] as const} style={styles.featureCheckCircle}>
+                  <Text style={styles.featureCheckMark}>✓</Text>
+                </LinearGradient>
+                <Text style={styles.featureText}>{h}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Description */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Description</Text>
+          <Text style={styles.descText}>{product.description}</Text>
+        </View>
+
+        {/* Specifications */}
+        {Object.keys(product.specifications).length > 0 && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionLabel}>Specifications</Text>
+            {Object.entries(product.specifications).map(([key, value], index) => (
+              <View key={key} style={[styles.specRow, index % 2 === 0 && styles.specRowAlt]}>
+                <Text style={styles.specKey}>{key}</Text>
+                <Text style={styles.specValue}>{value}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Fixed Bottom CTA */}
+      {/* Bottom Bar */}
       <View style={styles.bottomBar}>
-        <View style={styles.bottomInfo}>
+        <View style={styles.bottomLeft}>
           {selectedEMIPlan && (
             <>
-              <Text style={styles.bottomLabel}>Monthly EMI</Text>
-              <Text style={styles.bottomPrice}>
-                ₹{selectedEMIPlan.monthlyAmount.toLocaleString('en-IN')}/mo
+              <Text style={styles.bottomEmiLabel}>Monthly EMI</Text>
+              <Text style={styles.bottomEmiPrice}>
+                {formatPrice(selectedEMIPlan.monthlyAmount)}
+                <Text style={styles.bottomEmiTenure}> ×{selectedEMIPlan.tenure}mo</Text>
               </Text>
-              <Text style={styles.bottomTenure}>for {selectedEMIPlan.tenure} months</Text>
             </>
           )}
         </View>
         <Pressable
-          style={[styles.continueButton, !product.inStock && styles.continueButtonDisabled]}
           onPress={handleContinue}
           disabled={!product.inStock}
+          style={({ pressed }) => [pressed && product.inStock && { transform: [{ scale: 0.97 }] }]}
         >
-          <Text style={styles.continueButtonText}>
-            {product.inStock ? 'Add to Cart' : 'Out of Stock'}
-          </Text>
+          <LinearGradient
+            colors={product.inStock ? (['#4F46E5', '#7C3AED'] as const) : (['#D1D5DB', '#9CA3AF'] as const)}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.addToCartBtn}
+          >
+            <Text style={styles.addToCartText}>
+              {product.inStock ? 'Add to Cart' : 'Out of Stock'}
+            </Text>
+            {product.inStock && <Text style={styles.addToCartArrow}>→</Text>}
+          </LinearGradient>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -361,401 +401,145 @@ export default function ProductDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
+  container: { flex: 1, backgroundColor: '#F8F9FC' },
+
+  // Loading / Error
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  loadingText: { fontSize: 14, color: '#9CA3AF', marginTop: 14 },
+  errorTitle: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 20 },
+  errorBtn: { backgroundColor: '#4F46E5', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  errorBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+
+  // Nav
+  navBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  scrollView: {
-    flex: 1,
+  navBtn: {
+    width: 42, height: 42, borderRadius: 14, backgroundColor: '#F3F4F6',
+    alignItems: 'center', justifyContent: 'center', position: 'relative',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
+  navBtnIcon: { fontSize: 22, color: '#111827', fontWeight: '500' },
+  navCenter: { flex: 1, alignItems: 'center' },
+  navBrand: { fontSize: 13, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1.2 },
+  navRight: { flexDirection: 'row', gap: 8 },
+  navCartBadge: {
+    position: 'absolute', top: -3, right: -3, backgroundColor: '#EF4444',
+    borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center',
+    justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: '#FFFFFF',
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
+  navCartBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
+
+  // Hero Image
+  heroSection: {
+    width: '100%', height: width * 0.8, backgroundColor: '#FFFFFF',
+    justifyContent: 'center', alignItems: 'center', position: 'relative',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
+  heroImage: { width: '100%', height: '100%' },
+  heroDiscountBadge: {
+    position: 'absolute', top: 16, left: 16,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
   },
-  errorIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+  heroDiscountText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
+  heartBtn: {
+    position: 'absolute', top: 16, right: 16, width: 46, height: 46,
+    borderRadius: 23, backgroundColor: '#FFFFFF', justifyContent: 'center',
+    alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, shadowRadius: 6, elevation: 4,
   },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
+  heartBtnActive: { backgroundColor: '#FEF2F2' },
+
+  // Info
+  infoSection: {
+    padding: 20, backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  errorText: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 24,
+  infoBrand: { fontSize: 12, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+  infoName: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5, lineHeight: 30, marginBottom: 12 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
+  ratingBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 4 },
+  ratingStar: { fontSize: 12, color: '#FFFFFF' },
+  ratingVal: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
+  ratingReviews: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  priceSection: { borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 16 },
+  priceMain: { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -0.5, marginBottom: 6 },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  priceOriginal: { fontSize: 15, color: '#D1D5DB', textDecorationLine: 'line-through' },
+  saveBadge: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  saveText: { fontSize: 12, fontWeight: '700', color: '#059669' },
+  outOfStock: { backgroundColor: '#FEF2F2', padding: 12, borderRadius: 10, marginTop: 12 },
+  outOfStockText: { fontSize: 14, fontWeight: '600', color: '#EF4444', textAlign: 'center' },
+
+  // Section Cards
+  sectionCard: { backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 18, marginTop: 8 },
+  sectionLabel: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 14, letterSpacing: -0.2 },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  sectionSub: { fontSize: 13, color: '#9CA3AF', marginBottom: 16, marginTop: -8 },
+  noCostBadgeHeader: { backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  noCostBadgeHeaderText: { fontSize: 11, fontWeight: '700', color: '#92400E' },
+
+  // Variants
+  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  variantChip: {
+    paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
   },
-  retryButton: {
-    backgroundColor: '#1E40AF',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
+  variantChipDefault: { backgroundColor: '#F3F4F6', borderWidth: 1.5, borderColor: '#E5E7EB' },
+  variantLabel: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  variantMod: { fontSize: 12, fontWeight: '500', color: '#9CA3AF' },
+
+  // EMI
+  emiCard: {
+    width: 150, padding: 18, borderRadius: 16, alignItems: 'center', position: 'relative',
   },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  emiCardDefault: {
+    backgroundColor: '#F9FAFB', borderWidth: 1.5, borderColor: '#E5E7EB',
   },
-  imageContainer: {
-    width: '100%',
-    height: width * 0.8,
-    backgroundColor: '#F9FAFB',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
+  emiCheckCircle: {
+    position: 'absolute', top: 10, right: 10, width: 22, height: 22,
+    borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  productImage: {
-    width: '100%',
-    height: '100%',
-  },
-  discountBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  discountText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  imageActions: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  actionIcon: {
-    fontSize: 24,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  brand: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  productName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
-    lineHeight: 30,
-    marginBottom: 8,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  ratingStar: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  priceSection: {
-    marginBottom: 24,
-    paddingBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  price: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-    marginRight: 12,
-  },
-  priceInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  originalPrice: {
-    fontSize: 18,
-    color: '#9CA3AF',
-    textDecorationLine: 'line-through',
-  },
-  savings: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#10B981',
-  },
-  outOfStockBanner: {
-    backgroundColor: '#FEE2E2',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    marginTop: 12,
-  },
-  outOfStockText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#DC2626',
-    textAlign: 'center',
-  },
-  variantSection: {
-    marginBottom: 24,
-  },
-  variantTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  variantSelected: {
-    color: '#1E40AF',
-  },
-  variantOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  variantOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-  },
-  variantOptionSelected: {
-    borderColor: '#1E40AF',
-    backgroundColor: '#EFF6FF',
-  },
-  variantOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  variantOptionTextSelected: {
-    color: '#1E40AF',
-    fontWeight: '600',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-  },
-  highlightItem: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  highlightBullet: {
-    fontSize: 16,
-    color: '#1E40AF',
-    marginRight: 8,
-    fontWeight: '700',
-  },
-  highlightText: {
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 20,
-    flex: 1,
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 22,
-  },
-  specRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  specKey: {
-    fontSize: 14,
-    color: '#6B7280',
-    flex: 1,
-  },
-  specValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#111827',
-    flex: 1,
-    textAlign: 'right',
-  },
-  emiPlansContainer: {
-    gap: 12,
-  },
-  emiPlan: {
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-  },
-  emiPlanSelected: {
-    borderColor: '#1E40AF',
-    backgroundColor: '#EFF6FF',
-  },
-  emiPlanHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  emiPlanInfo: {
-    flex: 1,
-  },
-  emiTenure: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  emiAmount: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E40AF',
-  },
-  radioButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioButtonSelected: {
-    borderColor: '#1E40AF',
-  },
-  radioButtonInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#1E40AF',
-  },
-  noCostBadge: {
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  noCostText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  emiPlanDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  emiDetailText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
+  emiCheckText: { fontSize: 12, color: '#FFFFFF', fontWeight: '700' },
+  emiTenure: { fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 8 },
+  emiAmount: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  emiPer: { fontSize: 11, fontWeight: '500', color: '#9CA3AF', marginTop: 2 },
+  noCostPill: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginTop: 10 },
+  noCostPillText: { fontSize: 11, fontWeight: '700', color: '#059669' },
+
+  // Features
+  featureItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14, gap: 12 },
+  featureCheckCircle: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  featureCheckMark: { fontSize: 13, color: '#FFFFFF', fontWeight: '700' },
+  featureText: { fontSize: 15, color: '#4B5563', lineHeight: 22, flex: 1 },
+
+  // Description
+  descText: { fontSize: 15, color: '#6B7280', lineHeight: 24 },
+
+  // Specs
+  specRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 8 },
+  specRowAlt: { backgroundColor: '#F9FAFB', borderRadius: 8 },
+  specKey: { fontSize: 13, color: '#6B7280', flex: 1 },
+  specValue: { fontSize: 13, fontWeight: '600', color: '#111827', flex: 1, textAlign: 'right' },
+
+  // Bottom Bar
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.08, shadowRadius: 16, elevation: 12,
   },
-  bottomInfo: {
-    flex: 1,
-    marginRight: 16,
+  bottomLeft: {},
+  bottomEmiLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '500', marginBottom: 2 },
+  bottomEmiPrice: { fontSize: 20, fontWeight: '800', color: '#4F46E5' },
+  bottomEmiTenure: { fontSize: 13, fontWeight: '400', color: '#9CA3AF' },
+  addToCartBtn: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 28,
+    paddingVertical: 16, borderRadius: 16, gap: 8,
   },
-  bottomLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  bottomPrice: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E40AF',
-  },
-  bottomTenure: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  continueButton: {
-    backgroundColor: '#1E40AF',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 10,
-    shadowColor: '#1E40AF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  continueButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-    shadowOpacity: 0,
-  },
-  continueButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  addToCartText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  addToCartArrow: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
 });

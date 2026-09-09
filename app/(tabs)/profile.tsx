@@ -1,8 +1,10 @@
 import { View, Text, StyleSheet, ScrollView, Pressable, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar barStyle="light-content" />
@@ -48,7 +50,10 @@ export default function ProfileScreen() {
             <Text style={styles.menuArrow}>›</Text>
           </Pressable>
 
-          <Pressable style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}>
+          <Pressable
+            style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+            onPress={() => router.push('/(tabs)/orders')}
+          >
             <View style={[styles.menuIconContainer, { backgroundColor: '#E0E7FF' }]}>
               <Text style={styles.menuIcon}>📜</Text>
             </View>

@@ -1,488 +1,296 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  StatusBar,
-  Image,
-  ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Pressable,
+  StatusBar, Image, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useOrders } from '../../contexts/OrdersContext';
+import { Order, OrderItem } from '../../types/product';
+import { Colors, Fonts, Space, Radii, Shadow, formatPrice } from '../../constants/theme';
 
 export default function OrdersScreen() {
   const router = useRouter();
-  const { orders, loading } = useOrders();
+  const { orders, loading, cancelOrder } = useOrders();
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all');
 
-  const formatPrice = (price: number): string => {
-    return `₹${price.toLocaleString('en-IN')}`;
+  const formatDate = (d?: string) => {
+    if (!d) return 'Pending';
+    return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+  const statusConfig: Record<string, { bg: string; text: string; icon: string }> = {
+    delivered: { bg: Colors.greenLight, text: Colors.green, icon: '✓' },
+    shipped: { bg: Colors.blueLight, text: Colors.blue, icon: '🚚' },
+    confirmed: { bg: Colors.orangeLight, text: '#B45309', icon: '⏱' },
+    cancelled: { bg: Colors.coralLight, text: Colors.coral, icon: '✕' },
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return { bg: '#D1FAE5', text: '#059669', gradient: ['#D1FAE5', '#A7F3D0'] };
-      case 'shipped':
-        return { bg: '#DBEAFE', text: '#2563EB', gradient: ['#DBEAFE', '#BFDBFE'] };
-      case 'confirmed':
-        return { bg: '#FEF3C7', text: '#D97706', gradient: ['#FEF3C7', '#FDE68A'] };
-      case 'cancelled':
-        return { bg: '#FEE2E2', text: '#DC2626', gradient: ['#FEE2E2', '#FECACA'] };
-      default:
-        return { bg: '#F3F4F6', text: '#6B7280', gradient: ['#F3F4F6', '#E5E7EB'] };
-    }
+  const handleCancel = (id: string, num: string) => {
+    Alert.alert('Cancel Order', `Cancel #${num}?`, [
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Cancel', style: 'destructive', onPress: () => { cancelOrder(id); Alert.alert('Cancelled', 'Order cancelled.'); } },
+    ]);
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return '✓';
-      case 'shipped':
-        return '🚚';
-      case 'confirmed':
-        return '⏱';
-      case 'cancelled':
-        return '✕';
-      default:
-        return '•';
-    }
+  const handleTrack = (order: Order) => {
+    Alert.alert(
+      `Order #${order.orderNumber}`,
+      `Status: ${order.status.charAt(0).toUpperCase() + order.status.slice(1)}\nOrdered: ${formatDate(order.createdAt)}\nEst. Delivery: ${formatDate(order.estimatedDelivery)}\n\n${order.deliveryAddress.fullName}\n${order.deliveryAddress.address}, ${order.deliveryAddress.city} - ${order.deliveryAddress.pincode}`,
+    );
   };
 
-  const filteredOrders = orders.filter(order => {
-    if (activeTab === 'active') {
-      return order.status === 'confirmed' || order.status === 'shipped';
-    }
-    if (activeTab === 'completed') {
-      return order.status === 'delivered';
-    }
+  const filteredOrders = orders.filter((o) => {
+    if (activeTab === 'active') return o.status === 'confirmed' || o.status === 'shipped';
+    if (activeTab === 'completed') return o.status === 'delivered';
     return true;
   });
 
+  const counts = {
+    all: orders.length,
+    active: orders.filter((o) => o.status === 'confirmed' || o.status === 'shipped').length,
+    completed: orders.filter((o) => o.status === 'delivered').length,
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
-        <StatusBar barStyle="light-content" />
-        <LinearGradient
-          colors={['#667eea', '#764ba2']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <Text style={styles.headerEmoji}>📦</Text>
-          <Text style={styles.headerTitle}>My Orders</Text>
-          <Text style={styles.headerSubtitle}>Track your purchases</Text>
-        </LinearGradient>
-        <View style={[styles.emptyState, { justifyContent: 'center' }]}>
-          <ActivityIndicator size="large" color="#667eea" />
-          <Text style={[styles.emptyText, { marginTop: 16 }]}>Loading orders...</Text>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.header}><Text style={styles.headerTitle}>My Orders</Text></View>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.loadingText}>Loading orders...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <StatusBar barStyle="light-content" />
-      
-      {/* Header */}
-      <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <Text style={styles.headerEmoji}>📦</Text>
-        <Text style={styles.headerTitle}>My Orders</Text>
-        <Text style={styles.headerSubtitle}>Track your purchases</Text>
-      </LinearGradient>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" />
 
-      {/* Tab Filter */}
-      <View style={styles.tabContainer}>
-        <Pressable
-          style={[styles.tab, activeTab === 'all' && styles.tabActive]}
-          onPress={() => setActiveTab('all')}
-        >
-          <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
-            All Orders
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === 'active' && styles.tabActive]}
-          onPress={() => setActiveTab('active')}
-        >
-          <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
-            Active
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === 'completed' && styles.tabActive]}
-          onPress={() => setActiveTab('completed')}
-        >
-          <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive]}>
-            Completed
-          </Text>
-        </Pressable>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>My Orders</Text>
+          <Text style={styles.headerSub}>{orders.length} {orders.length === 1 ? 'purchase' : 'purchases'}</Text>
+        </View>
       </View>
 
-      {/* Orders List */}
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      {/* Tabs */}
+      <View style={styles.tabBar}>
+        {([
+          { key: 'all' as const, label: 'All' },
+          { key: 'active' as const, label: 'Active' },
+          { key: 'completed' as const, label: 'Done' },
+        ]).map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <Pressable key={tab.key} onPress={() => setActiveTab(tab.key)}>
+              {isActive ? (
+                <LinearGradient colors={Colors.gradientPrimary} style={styles.tabPill}>
+                  <Text style={styles.tabTextActive}>{tab.label} ({counts[tab.key]})</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.tabPillInactive}>
+                  <Text style={styles.tabText}>{tab.label} ({counts[tab.key]})</Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
         {filteredOrders.length === 0 ? (
-          <View style={styles.emptyState}>
-            <LinearGradient
-              colors={['#F3F4F6', '#E5E7EB']}
-              style={styles.emptyIconContainer}
-            >
-              <Text style={styles.emptyIcon}>📦</Text>
+          <View style={styles.emptyWrap}>
+            <LinearGradient colors={Colors.gradientPrimary} style={styles.emptyCircle}>
+              <Text style={styles.emptyEmoji}>📦</Text>
             </LinearGradient>
             <Text style={styles.emptyTitle}>No orders found</Text>
-            <Text style={styles.emptyText}>
-              {activeTab === 'active' && 'You have no active orders'}
-              {activeTab === 'completed' && 'You have no completed orders'}
-              {activeTab === 'all' && 'Start shopping to see your orders here'}
+            <Text style={styles.emptySub}>
+              {activeTab === 'all' ? 'Start shopping to see orders here' :
+               activeTab === 'active' ? 'No active orders' : 'No completed orders'}
             </Text>
-            <Pressable
-              style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaButtonPressed]}
-              onPress={() => router.push('/marketplace')}
-            >
-              <LinearGradient
-                colors={['#667eea', '#764ba2']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.ctaGradient}
-              >
-                <Text style={styles.ctaText}>Start Shopping</Text>
-                <Text style={styles.ctaArrow}>→</Text>
+            <Pressable onPress={() => router.push('/marketplace')} style={({ pressed }) => [pressed && { transform: [{ scale: 0.96 }] }]}>
+              <LinearGradient colors={Colors.gradientPrimary} style={styles.emptyBtn}>
+                <Text style={styles.emptyBtnText}>Browse Products</Text>
               </LinearGradient>
             </Pressable>
           </View>
         ) : (
-          <View style={styles.ordersContainer}>
+          <View style={styles.ordersList}>
             {filteredOrders.map((order) => {
-              const statusStyle = getStatusColor(order.status);
-              
+              const st = statusConfig[order.status] || { bg: Colors.cardAlt, text: Colors.textMuted, icon: '•' };
+
               return (
-                <Pressable
-                  key={order.id}
-                  style={({ pressed }) => [
-                    styles.orderCard,
-                    pressed && styles.orderCardPressed,
-                  ]}
-                >
+                <View key={order.id} style={styles.orderCard}>
+                  {/* Header */}
                   <View style={styles.orderHeader}>
-                    <View style={styles.orderInfo}>
-                      <Text style={styles.orderId}>#{order.orderNumber}</Text>
+                    <View>
+                      <Text style={styles.orderNum}>#{order.orderNumber}</Text>
                       <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
                     </View>
-                    <LinearGradient
-                      colors={statusStyle.gradient}
-                      style={styles.statusBadge}
-                    >
-                      <Text style={styles.statusIcon}>{getStatusIcon(order.status)}</Text>
-                      <Text style={[styles.statusText, { color: statusStyle.text }]}>
+                    <View style={[styles.statusPill, { backgroundColor: st.bg }]}>
+                      <Text style={styles.statusIcon}>{st.icon}</Text>
+                      <Text style={[styles.statusText, { color: st.text }]}>
                         {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                       </Text>
-                    </LinearGradient>
-                  </View>
-
-                  {/* Order Items Preview */}
-                  <View style={styles.itemsPreview}>
-                    {order.items[0]?.productImage ? (
-                      <Image
-                        source={{ uri: order.items[0].productImage }}
-                        style={styles.itemImage}
-                      />
-                    ) : (
-                      <View style={[styles.itemImage, { backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Text style={{ fontSize: 32 }}>📦</Text>
-                      </View>
-                    )}
-                    <View style={styles.itemDetails}>
-                      <Text style={styles.itemName} numberOfLines={2}>
-                        {order.items[0]?.productName || 'Order Item'}
-                      </Text>
-                      {order.items.length > 1 && (
-                        <Text style={styles.moreItems}>
-                          +{order.items.length - 1} more {order.items.length - 1 === 1 ? 'item' : 'items'}
-                        </Text>
-                      )}
                     </View>
                   </View>
 
-                  {/* Order Footer */}
+                  {/* Items */}
+                  {order.items.map((item: OrderItem, idx: number) => (
+                    <View key={item.id || `${order.id}-${idx}`} style={styles.itemRow}>
+                      {item.productImage ? (
+                        <Image source={{ uri: item.productImage }} style={styles.itemImg} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.itemImg, styles.imgPlaceholder]}><Text style={{ fontSize: 22 }}>📦</Text></View>
+                      )}
+                      <View style={styles.itemInfo}>
+                        {item.brand && <Text style={styles.itemBrand}>{item.brand}</Text>}
+                        <Text style={styles.itemName} numberOfLines={1}>{item.productName}</Text>
+
+                        {item.variantDetails && item.variantDetails.length > 0 && (
+                          <View style={styles.chipRow}>
+                            {item.variantDetails.map((v, vi) => (
+                              <View key={`${v.type}-${vi}`} style={styles.chip}>
+                                <Text style={styles.chipText}>{v.value}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+
+                        {item.selectedEMIPlan && (
+                          <View style={styles.emiChip}>
+                            <Text style={styles.emiChipText}>
+                              💳 ₹{item.selectedEMIPlan.monthlyAmount.toLocaleString('en-IN')}/mo × {item.selectedEMIPlan.tenure}mo
+                              {item.selectedEMIPlan.isNoCost ? ' · No Cost' : ''}
+                            </Text>
+                          </View>
+                        )}
+
+                        <View style={styles.priceRow}>
+                          <Text style={styles.itemQty}>Qty: {item.quantity}</Text>
+                          <Text style={styles.itemTotal}>{formatPrice(item.totalPrice || item.price * item.quantity)}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* Delivery */}
+                  {order.deliveryAddress && (
+                    <View style={styles.deliveryBox}>
+                      <Text style={styles.deliveryHeading}>📍 Delivery</Text>
+                      <Text style={styles.deliveryName}>{order.deliveryAddress.fullName} · {order.deliveryAddress.phone}</Text>
+                      <Text style={styles.deliveryAddr} numberOfLines={2}>
+                        {order.deliveryAddress.address}, {order.deliveryAddress.city} - {order.deliveryAddress.pincode}
+                      </Text>
+                      <Text style={styles.deliveryEta}>🚚 Est: {formatDate(order.estimatedDelivery)}</Text>
+                    </View>
+                  )}
+
+                  {/* Footer */}
                   <View style={styles.orderFooter}>
                     <View>
-                      <Text style={styles.totalLabel}>Total Amount</Text>
-                      <Text style={styles.totalAmount}>{formatPrice(order.totalAmount)}</Text>
+                      <Text style={styles.footerLabel}>Total (incl. GST)</Text>
+                      <Text style={styles.footerTotal}>{formatPrice(order.totalAmount)}</Text>
                     </View>
-                    <View style={styles.actionButtons}>
-                      <Pressable style={styles.actionButton}>
-                        <Text style={styles.actionButtonText}>Track Order</Text>
+                    <View style={styles.footerActions}>
+                      {order.status === 'confirmed' && (
+                        <Pressable style={styles.cancelBtn} onPress={() => handleCancel(order.id, order.orderNumber)}>
+                          <Text style={styles.cancelBtnText}>Cancel</Text>
+                        </Pressable>
+                      )}
+                      <Pressable style={styles.trackBtn} onPress={() => handleTrack(order)}>
+                        <Text style={styles.trackBtnText}>Track</Text>
                       </Pressable>
                     </View>
                   </View>
-                </Pressable>
+                </View>
               );
             })}
           </View>
         )}
-
-        <View style={{ height: 20 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: Colors.bg },
+
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 48,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    alignItems: 'center',
+    paddingHorizontal: Space.xl, paddingTop: Space.md, paddingBottom: Space.lg,
+    backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  headerEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
+  headerTitle: { ...Fonts.h1, color: Colors.text },
+  headerSub: { ...Fonts.caption, color: Colors.textMuted, marginTop: 2 },
+
+  // Tabs
+  tabBar: {
+    flexDirection: 'row', gap: Space.sm,
+    paddingHorizontal: Space.xl, paddingVertical: Space.md,
+    backgroundColor: Colors.card,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.95)',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 20,
-    marginTop: -20,
-    borderRadius: 16,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 12,
-  },
-  tabActive: {
-    backgroundColor: '#EEF2FF',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9CA3AF',
-  },
-  tabTextActive: {
-    color: '#667eea',
-  },
-  scrollView: {
-    flex: 1,
-    marginTop: 20,
-  },
-  ordersContainer: {
-    padding: 20,
-  },
-  orderCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  orderCardPressed: {
-    opacity: 0.95,
-    transform: [{ scale: 0.99 }],
-  },
-  orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  orderInfo: {
-    flex: 1,
-  },
-  orderId: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  orderDate: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusIcon: {
-    fontSize: 14,
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  itemsPreview: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  itemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-  },
-  itemDetails: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  moreItems: {
-    fontSize: 13,
-    color: '#667eea',
-    fontWeight: '600',
-  },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  totalAmount: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#667eea',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-  },
-  actionButton: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  actionButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#667eea',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 48,
-    marginTop: 40,
-  },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  emptyIcon: {
-    fontSize: 56,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 12,
-    letterSpacing: -0.3,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 32,
-  },
-  ctaButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  ctaButtonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  ctaGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-  },
-  ctaText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
-    marginRight: 8,
-  },
-  ctaArrow: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-  },
+  tabPill: { paddingHorizontal: Space.lg, paddingVertical: Space.sm, borderRadius: Radii.pill },
+  tabPillInactive: { paddingHorizontal: Space.lg, paddingVertical: Space.sm, borderRadius: Radii.pill, backgroundColor: Colors.cardAlt, borderWidth: 1, borderColor: Colors.border },
+  tabTextActive: { ...Fonts.captionBold, color: Colors.textWhite },
+  tabText: { ...Fonts.captionBold, color: Colors.textMuted },
+
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { ...Fonts.caption, color: Colors.textMuted, marginTop: Space.lg },
+
+  // Empty
+  emptyWrap: { alignItems: 'center', paddingVertical: 64, paddingHorizontal: Space.xxxl },
+  emptyCircle: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', marginBottom: Space.xxl, ...Shadow.glow(Colors.accent) },
+  emptyEmoji: { fontSize: 44 },
+  emptyTitle: { ...Fonts.h2, color: Colors.text, marginBottom: Space.sm },
+  emptySub: { ...Fonts.body, color: Colors.textMuted, textAlign: 'center', marginBottom: Space.xxl },
+  emptyBtn: { paddingHorizontal: Space.xxl, paddingVertical: Space.lg, borderRadius: Radii.lg },
+  emptyBtnText: { ...Fonts.bodySemibold, color: Colors.textWhite },
+
+  // Orders
+  ordersList: { padding: Space.lg, gap: Space.md },
+  orderCard: { backgroundColor: Colors.card, borderRadius: Radii.xl, padding: Space.xl, ...Shadow.card },
+  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Space.lg },
+  orderNum: { ...Fonts.captionBold, color: Colors.text },
+  orderDate: { ...Fonts.tiny, color: Colors.textMuted, marginTop: 2 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Space.md, paddingVertical: Space.xs, borderRadius: Radii.pill, gap: 4 },
+  statusIcon: { fontSize: 12 },
+  statusText: { ...Fonts.tinyBold },
+
+  // Item Row
+  itemRow: { flexDirection: 'row', marginBottom: Space.md, paddingBottom: Space.md, borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  itemImg: { width: 64, height: 64, borderRadius: Radii.md, backgroundColor: Colors.cardAlt },
+  imgPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  itemInfo: { flex: 1, marginLeft: Space.md },
+  itemBrand: { ...Fonts.label, color: Colors.textLight, marginBottom: 1, fontSize: 10 },
+  itemName: { ...Fonts.captionBold, color: Colors.text, marginBottom: Space.xs },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: Space.xs },
+  chip: { backgroundColor: Colors.cardAlt, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radii.sm, borderWidth: 1, borderColor: Colors.border },
+  chipText: { fontSize: 10, fontWeight: '600', color: Colors.textMuted },
+  emiChip: { backgroundColor: Colors.accentSoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radii.sm, alignSelf: 'flex-start', marginBottom: Space.xs },
+  emiChipText: { fontSize: 10, fontWeight: '700', color: Colors.accent },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  itemQty: { ...Fonts.tiny, color: Colors.textMuted },
+  itemTotal: { ...Fonts.captionBold, color: Colors.text },
+
+  // Delivery
+  deliveryBox: { backgroundColor: Colors.cardAlt, borderRadius: Radii.md, padding: Space.md, marginBottom: Space.lg, borderWidth: 1, borderColor: Colors.border },
+  deliveryHeading: { ...Fonts.tinyBold, color: Colors.textMuted, marginBottom: Space.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
+  deliveryName: { ...Fonts.captionBold, color: Colors.text, marginBottom: 2 },
+  deliveryAddr: { ...Fonts.tiny, color: Colors.textMuted, lineHeight: 16 },
+  deliveryEta: { ...Fonts.tinyBold, color: Colors.green, marginTop: Space.xs },
+
+  // Footer
+  orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  footerLabel: { ...Fonts.tiny, color: Colors.textMuted, marginBottom: 2 },
+  footerTotal: { ...Fonts.priceSmall, color: Colors.accent },
+  footerActions: { flexDirection: 'row', gap: Space.sm },
+  cancelBtn: { paddingHorizontal: Space.lg, paddingVertical: Space.sm, borderRadius: Radii.md, backgroundColor: Colors.coralLight },
+  cancelBtnText: { ...Fonts.captionBold, color: Colors.coral },
+  trackBtn: { paddingHorizontal: Space.lg, paddingVertical: Space.sm, borderRadius: Radii.md, backgroundColor: Colors.accentSoft },
+  trackBtnText: { ...Fonts.captionBold, color: Colors.accent },
 });

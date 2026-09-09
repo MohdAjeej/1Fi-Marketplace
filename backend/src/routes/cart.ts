@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
@@ -7,7 +7,7 @@ const router = Router();
 const prisma = new PrismaClient();
 
 // Get user's cart
-router.get('/', authenticate, async (req: AuthRequest, res) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const cartItems = await prisma.cartItem.findMany({
       where: { userId: req.userId! },
@@ -38,7 +38,7 @@ router.post(
     body('emiPlanId').optional(),
     body('quantity').isInt({ min: 1 }).default(1),
   ],
-  async (req: AuthRequest, res) => {
+  async (req: AuthRequest, res: Response): Promise<any> => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -128,9 +128,9 @@ router.put(
     body('selectedVariants').optional().isObject(),
     body('emiPlanId').optional(),
   ],
-  async (req: AuthRequest, res) => {
+  async (req: AuthRequest, res: Response): Promise<any> => {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -172,9 +172,9 @@ router.put(
 );
 
 // Remove item from cart
-router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
+router.delete('/:id', authenticate, async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const cartItem = await prisma.cartItem.findFirst({
       where: {
@@ -199,7 +199,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Clear cart
-router.delete('/', authenticate, async (req: AuthRequest, res) => {
+router.delete('/', authenticate, async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     await prisma.cartItem.deleteMany({
       where: { userId: req.userId! },
@@ -213,3 +213,4 @@ router.delete('/', authenticate, async (req: AuthRequest, res) => {
 });
 
 export default router;
+

@@ -16,7 +16,14 @@ import { useRouter } from 'expo-router';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 
-const TOP_BRANDS = [
+const TOP_BRANDS: {
+  id: number;
+  name: string;
+  logo: string;
+  gradient: readonly [string, string];
+  products: string;
+  description: string;
+}[] = [
   {
     id: 1,
     name: 'Apple',

@@ -267,14 +267,14 @@ export default function ProductDetailScreen() {
                       >
                         {option.name}
                       </Text>
-                      {option.priceModifier > 0 && (
+                      {Boolean(option.priceModifier && option.priceModifier > 0) && (
                         <Text
                           style={[
                             styles.modifierText,
                             isSelected && styles.modifierTextSelected,
                           ]}
                         >
-                          +{formatPrice(option.priceModifier)}
+                          +{formatPrice(option.priceModifier || 0)}
                         </Text>
                       )}
                     </LinearGradient>

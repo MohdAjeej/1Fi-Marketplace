@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
@@ -7,7 +7,7 @@ const router = Router();
 const prisma = new PrismaClient();
 
 // Get user's orders
-router.get('/', authenticate, async (req: AuthRequest, res) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const orders = await prisma.order.findMany({
       where: { userId: req.userId! },
@@ -30,9 +30,9 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Get single order
-router.get('/:id', authenticate, async (req: AuthRequest, res) => {
+router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const order = await prisma.order.findFirst({
       where: {
@@ -76,7 +76,7 @@ router.post(
     body('shippingAddress.pincode').notEmpty(),
     body('shippingAddress.country').notEmpty(),
   ],
-  async (req: AuthRequest, res) => {
+  async (req: AuthRequest, res: Response): Promise<any> => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -159,11 +159,11 @@ router.post(
               }
 
               return {
-                productId: item.productId,
-                emiPlanId: item.emiPlanId!,
-                selectedVariants: item.selectedVariants,
                 quantity: item.quantity,
                 price: itemPrice * item.quantity,
+                selectedVariants: item.selectedVariants as any,
+                product: { connect: { id: item.productId } },
+                emiPlan: { connect: { id: item.emiPlanId! } },
               };
             }),
           },
@@ -195,9 +195,10 @@ router.post(
 );
 
 // Cancel order
-router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
+router.post('/:id/cancel', authenticate, async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
+
 
     const order = await prisma.order.findFirst({
       where: {
